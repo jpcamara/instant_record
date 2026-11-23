@@ -51,6 +51,8 @@ module InstantRecord
       record_result(**result)
     rescue NotPermitted
       record_result(status: "rejected", reason: "not permitted", server_attributes: server_attributes_for(model))
+    rescue YjsMerge::Invalid => e
+      record_result(status: "rejected", reason: e.message, server_attributes: server_attributes_for(model))
     rescue ActiveRecord::RecordInvalid => e
       record_result(status: "rejected", reason: e.record.errors.full_messages.to_sentence,
         server_attributes: server_attributes_for(model))
@@ -231,6 +233,10 @@ module InstantRecord
         return { status: "rejected", reason: "record not found" } if existing && existing[column] != @scope
       end
 
+      # A :yjs column's incoming state is merged into the stored one first, so
+      # every path below writes the merge, never the bare incoming state.
+      merge_yjs_columns!(model) if %w[create update].include?(@mutation[:operation])
+
       server_now = HLC.wall_now
 
       case @mutation[:operation]
@@ -295,7 +301,12 @@ module InstantRecord
       # No concurrent version bump (or legacy caller with no base_version /
       # metadata-only touch): compare clamped HLCs.
       if record_hlc.present? && HLC.compare(incoming_hlc, record_hlc) < 0
-        return skipped_result(record, record_hlc)
+        # An older write still carries edits a :yjs column keeps. Apply those
+        # alone, stamped after what the record holds.
+        candidate_attrs = yjs_changes(model, record)
+        return skipped_result(record, record_hlc) if candidate_attrs.empty?
+
+        incoming_hlc = HLC.advance_past(record_hlc, incoming_hlc, now: server_now, node: HLC::SERVER_NODE)
       end
 
       safe_changes = clamp_updated_at(candidate_attrs, server_now, incoming_hlc)
@@ -316,8 +327,14 @@ module InstantRecord
       live_attrs = InstantRecord.wire_attributes(record.attributes)
       incoming_node = HLC.node(incoming_hlc)
 
+      yjs_columns = model.instant_record_yjs_columns
+      text_columns = yjs_columns.values.compact
+
       winning = {}
       user_columns.each do |col|
+        # A :yjs column's text column follows its document, after this loop.
+        next if text_columns.include?(col)
+
         col_info =
           if has_base
             server_touched[col]
@@ -355,7 +372,14 @@ module InstantRecord
             incoming_wins: col_info[:hlc].nil? || HLC.compare(incoming_hlc, col_info[:hlc]) >= 0
           )
           winning[col] = merged_val if merged_val != record.public_send(col)
+        when :yjs
+          # Already merged with the stored state, so it holds both sides.
+          winning[col] = @changes[col] if @changes[col] != record.public_send(col)
         end
+      end
+
+      yjs_columns.each do |col, text_col|
+        winning[text_col] = @changes[text_col] if text_col && winning.key?(col)
       end
 
       return skipped_result(record, record_hlc) if winning.empty?
@@ -451,6 +475,35 @@ module InstantRecord
     #   - JSON-encoded array strings (e.g. '["a","b"]' in SQLite text columns)
     #   - Hashes / JSON objects (3-way key merge; LWW on colliding keys)
     #   - Comma-separated strings (e.g. "bug, urgent")
+    # Replaces each incoming :yjs state with its merge into the stored one, and
+    # fills the column's text column from the result. A write to a text column
+    # without its document is dropped: the text always comes from the document.
+    def merge_yjs_columns!(model)
+      columns = model.instant_record_yjs_columns
+      return if columns.empty?
+
+      stored = model.find_by(id: @mutation[:record_id]) if @mutation[:operation] == "update"
+      columns.each do |column, text_column|
+        if @changes.key?(column)
+          merged, doc = YjsMerge.merge(stored && stored[column], @changes[column])
+          @changes[column] = merged
+          @changes[text_column] = YjsMerge.text(doc, text_column) if text_column
+        elsif text_column
+          @changes.delete(text_column)
+        end
+      end
+    end
+
+    # The :yjs columns (and their text columns) this write changes.
+    def yjs_changes(model, record)
+      model.instant_record_yjs_columns.each_with_object({}) do |(column, text_column), changes|
+        next unless @changes.key?(column) && @changes[column] != record[column]
+
+        changes[column] = @changes[column]
+        changes[text_column] = @changes[text_column] if text_column
+      end
+    end
+
     def merge_union(base_val, server_val, client_val, incoming_wins:)
       if server_val.is_a?(Array) || client_val.is_a?(Array)
         return merge_array_union(base_val.is_a?(Array) ? base_val : nil, Array(server_val), Array(client_val))
