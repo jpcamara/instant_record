@@ -13,6 +13,7 @@ module InstantRecord
     class GemVendor
       COPY = %w[
         lib/instant_record.rb
+        lib/instant_record/constants.rb
         lib/instant_record/version.rb
         lib/instant_record/host.rb
         lib/instant_record/configuration.rb

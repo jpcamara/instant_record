@@ -207,7 +207,7 @@ class CompilerTest < ActiveSupport::TestCase
       assert_equal manifest.to_h, staged.manifest.to_h
 
       count = InstantRecord::Compiler::GemVendor.vendor(gem_src: GEM_ROOT, app_dir: app, demo: true)
-      assert_equal 21, count
+      assert_equal 22, count
       assert File.file?(File.join(app, "lib/instant_record/client/rebaser.rb"))
       assert File.file?(File.join(app, "lib/instant_record/read_tracker.rb"))
       assert File.file?(File.join(app, "lib/instant_record/sync_notice.rb"))
