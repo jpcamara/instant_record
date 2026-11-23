@@ -514,6 +514,7 @@ Things to try:
 - **Infinite scroll** — `/slack` seeds thousands of messages in `#general`, but a fresh client only syncs the newest 50 per conversation. Scroll to the top and older pages stream in; messages arriving mid-read update the page without a reload or a scroll jump.
 - **Offline** — stop the Rails server, create issues (they stay `pending`), reload the tab (still there), restart the server and watch them drain.
 - **Sessions and permissions** — open `/auth`, sign in as Ada, Ben or Cleo, and watch which notes this browser holds. Sign out and they leave it. "Ask the sync server for everything" shows what a browser with that cookie can get by asking directly.
+- **Offline co-editing** — open a draft at `/drafts` in two browsers, take both offline, and edit the same sentence in each. When both reconnect, the server merges the two texts and both edits survive.
 - **Rejection** — create an issue titled `reject me`. It appears optimistically, the server refuses it, and it disappears on reconcile.
 
 ## Scaling the SSE stream

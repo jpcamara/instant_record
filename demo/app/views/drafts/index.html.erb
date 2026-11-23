@@ -1,0 +1,24 @@
+<% content_for(:title, "Drafts — InstantRecord") %>
+
+<div class="page">
+  <header class="page-header">
+    <h1>Drafts</h1>
+    <p class="meta">
+      Open a draft in two browsers, take both offline, and edit the same
+      sentence. When they reconnect, the server merges the two texts.
+    </p>
+  </header>
+
+  <div class="card">
+    <%= form_with url: drafts_path, method: :post, class: "draft-form", data: { turbo: false } do |f| %>
+      <%= f.text_field "draft[title]", placeholder: "New draft title", aria: { label: "New draft title" }, required: true %>
+      <%= f.submit "Create" %>
+    <% end %>
+
+    <ul class="drafts">
+      <% @drafts.each do |draft| %>
+        <li data-id="<%= draft.id %>"><%= link_to draft.title, draft_path(draft) %></li>
+      <% end %>
+    </ul>
+  </div>
+</div>

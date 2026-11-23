@@ -200,7 +200,7 @@ class CompilerTest < ActiveSupport::TestCase
       assert File.file?(manifest_path)
       manifest = InstantRecord::Compiler::Manifest.read(manifest_path)
       assert_equal "island", manifest.mode
-      assert_equal %w[AssistantChat AssistantTurn AuthNote Channel ChatUser Issue MailEntry Message Note], manifest.synced_model_names
+      assert_equal %w[AssistantChat AssistantTurn AuthNote Channel ChatUser Draft Issue MailEntry Message Note], manifest.synced_model_names
       assert_equal({ "limit" => 50, "partition_by" => "channel_id" }, manifest.sync_windows["Message"])
       assert_equal({ "column" => "visitor_id", "policy" => false }, manifest.sync_scopes["AssistantChat"])
       assert_equal({ "column" => nil, "policy" => true }, manifest.sync_scopes["AuthNote"])

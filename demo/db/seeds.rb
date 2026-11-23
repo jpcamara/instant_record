@@ -17,4 +17,6 @@ unless InstantRecord.browser?
   MailHistory.populate
   require_relative "seeds/assistant_chats"
   AssistantChats.apply
+  require_relative "seeds/drafts"
+  Drafts.apply
 end

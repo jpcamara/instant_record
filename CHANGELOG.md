@@ -3,6 +3,7 @@
 ## Unreleased
 
 - **Yjs columns (`sync_merge :col, :yjs, text:`).** A column can hold a Yjs document (its state as a Base64 update). The server merges each write into the stored document with [yrby](https://github.com/jpcamara/yrby) instead of choosing a winner, so concurrent and offline edits to the same text all survive, including writes older than the record. `text:` names a column the server fills with the document's text. yrby is required only when a model declares a `:yjs` column.
+- Added the Drafts demo (`/drafts`), where two browsers edit one text offline and both edits survive the sync (`sync_merge :body_ydoc, :yjs, text: :body`), with a compiled browser test (`compiled/test/drafts.mjs`).
 
 ## 0.3.0 (2026-11-21)
 

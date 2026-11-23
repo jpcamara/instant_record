@@ -290,7 +290,7 @@ class LocalFirstIslandsTest < ActiveSupport::TestCase
     manifest = InstantRecord::Compiler.manifest(root: File.join(GEM_ROOT, "demo"))
 
     assert_equal "island", manifest.mode
-    assert_equal %w[AssistantChat AssistantTurn AuthNote Channel ChatUser Issue MailEntry Message Note], manifest.synced_model_names
+    assert_equal %w[AssistantChat AssistantTurn AuthNote Channel ChatUser Draft Issue MailEntry Message Note], manifest.synced_model_names
 
     server_pairs = manifest.server_routes.map { |r| [r["method"], r["path"]] }
     assert_includes server_pairs, ["POST", "/slack/reset"]

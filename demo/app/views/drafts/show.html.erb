@@ -1,0 +1,22 @@
+<% content_for(:title, "#{@draft.title} — InstantRecord") %>
+
+<div class="page" data-controller="draft" data-instant-refresh
+     data-draft-url-value="<%= draft_path(@draft) %>"
+     data-action="instant-record:records-changed@window->draft#pull">
+  <header class="page-header">
+    <h1><%= @draft.title %></h1>
+    <p class="meta">
+      Each save sends the text's whole Yjs document. The server merges it with
+      the one it holds, so two offline edits both survive. The text it shows
+      everyone is read from the merged document.
+    </p>
+  </header>
+
+  <div class="card">
+    <textarea class="draft-editor" rows="10" aria-label="Draft text"
+              data-draft-target="editor" data-action="input->draft#input"><%= @draft.body %></textarea>
+  </div>
+  <%= render "state" %>
+
+  <p class="meta">This page was rendered by Rails <%= InstantRecord.browser? ? "inside your browser" : "on the server" %>: <b><%= InstantRecord.browser? ? "Spinel + SQLite" : "CRuby + Postgres" %></b>.</p>
+</div>
