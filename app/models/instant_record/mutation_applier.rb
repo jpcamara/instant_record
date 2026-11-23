@@ -470,11 +470,6 @@ module InstantRecord
         HLC.compare(incoming_hlc, col_info[:hlc]) > 0
     end
 
-    # 3-way collection union for `sync_merge :col, :union`:
-    #   - Arrays (native Postgres arrays, JSON/serialized arrays)
-    #   - JSON-encoded array strings (e.g. '["a","b"]' in SQLite text columns)
-    #   - Hashes / JSON objects (3-way key merge; LWW on colliding keys)
-    #   - Comma-separated strings (e.g. "bug, urgent")
     # Replaces each incoming :yjs state with its merge into the stored one, and
     # fills the column's text column from the result. A write to a text column
     # without its document is dropped: the text always comes from the document.
@@ -504,6 +499,11 @@ module InstantRecord
       end
     end
 
+    # 3-way collection union for `sync_merge :col, :union`:
+    #   - Arrays (native Postgres arrays, JSON/serialized arrays)
+    #   - JSON-encoded array strings (e.g. '["a","b"]' in SQLite text columns)
+    #   - Hashes / JSON objects (3-way key merge; LWW on colliding keys)
+    #   - Comma-separated strings (e.g. "bug, urgent")
     def merge_union(base_val, server_val, client_val, incoming_wins:)
       if server_val.is_a?(Array) || client_val.is_a?(Array)
         return merge_array_union(base_val.is_a?(Array) ? base_val : nil, Array(server_val), Array(client_val))
