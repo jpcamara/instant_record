@@ -1,21 +1,25 @@
 import { Controller } from "@hotwired/stimulus"
 import * as Y from "yjs"
 
-// The text lives in a Yjs document. Typing edits the document, and each save
-// sends its whole state to the draft's update action, which stores it in the
-// local database to sync. When the record changes (another tab, or the
-// server's merge arriving), the page reads the stored state and merges it in.
+// Each field (the title, the text) lives in its own Yjs document. Typing edits
+// the document, and each save sends every document's whole state to the
+// draft's update action, which stores them in the local database to sync. When
+// the record changes (another tab, or the server's merge arriving), the page
+// reads the stored states and merges them in.
 export default class extends Controller {
-  static targets = ["editor", "state"]
+  static targets = ["field", "state"]
   static values = { url: String }
 
   connect() {
-    this.doc = new Y.Doc()
-    this.text = this.doc.getText("body")
-    this.merge(this.stateTarget.dataset.state)
-    this.editorTarget.value = this.text.toString()
-    this.doc.on("update", (_update, origin) => {
-      if (origin !== REMOTE) this.scheduleSave()
+    this.fields = this.fieldTargets.map((element) => {
+      const doc = new Y.Doc()
+      const field = { element, column: element.dataset.column, doc, text: doc.getText(element.dataset.column) }
+      this.merge(field, this.stateTarget.dataset[`${field.column}State`])
+      element.value = field.text.toString()
+      doc.on("update", (_update, origin) => {
+        if (origin !== REMOTE) this.scheduleSave()
+      })
+      return field
     })
   }
 
@@ -24,10 +28,11 @@ export default class extends Controller {
     if (this.dirty) this.save()
   }
 
-  // Turns the textarea's change into one delete and one insert.
-  input() {
-    const before = this.text.toString()
-    const after = this.editorTarget.value
+  // Turns the field's change into one delete and one insert.
+  input({ target }) {
+    const field = this.fields.find((field) => field.element === target)
+    const before = field.text.toString()
+    const after = target.value
     let start = 0
     while (start < before.length && start < after.length && before[start] === after[start]) start++
     let endBefore = before.length
@@ -36,9 +41,9 @@ export default class extends Controller {
       endBefore--
       endAfter--
     }
-    this.doc.transact(() => {
-      if (endBefore > start) this.text.delete(start, endBefore - start)
-      if (endAfter > start) this.text.insert(start, after.slice(start, endAfter))
+    field.doc.transact(() => {
+      if (endBefore > start) field.text.delete(start, endBefore - start)
+      if (endAfter > start) field.text.insert(start, after.slice(start, endAfter))
     })
   }
 
@@ -52,8 +57,10 @@ export default class extends Controller {
     this.dirty = false
     const body = new URLSearchParams()
     body.set("_method", "patch")
-    body.set("draft[body]", this.text.toString())
-    body.set("draft[body_ydoc]", toBase64(Y.encodeStateAsUpdate(this.doc)))
+    for (const field of this.fields) {
+      body.set(`draft[${field.column}]`, field.text.toString())
+      body.set(`draft[${field.column}_ydoc]`, toBase64(Y.encodeStateAsUpdate(field.doc)))
+    }
     const token = document.querySelector("meta[name='csrf-token']")?.content
     const response = await fetch(this.urlValue, { method: "POST", body, headers: token ? { "X-CSRF-Token": token } : {} })
     if (response.ok) this.read(await response.text())
@@ -68,29 +75,29 @@ export default class extends Controller {
   read(html) {
     const template = document.createElement("template")
     template.innerHTML = html.trim()
-    const fresh = template.content.querySelector("[data-state]")
+    const fresh = template.content.querySelector("[data-draft-target=state]")
     if (!fresh) return
-    this.merge(fresh.dataset.state)
+    for (const field of this.fields) this.merge(field, fresh.dataset[`${field.column}State`])
   }
 
-  // Merges a stored state into the document and redraws the textarea, keeping
-  // the cursor on the same characters.
-  merge(state) {
+  // Merges a stored state into the field's document and redraws the field,
+  // keeping the cursor on the same characters.
+  merge(field, state) {
     if (!state) return
-    const editor = this.editorTarget
-    const focused = document.activeElement === editor
-    const anchor = Y.createRelativePositionFromTypeIndex(this.text, editor.selectionStart)
-    const head = Y.createRelativePositionFromTypeIndex(this.text, editor.selectionEnd)
-    const before = this.text.toString()
-    Y.applyUpdate(this.doc, fromBase64(state), REMOTE)
-    const after = this.text.toString()
+    const { element, doc, text } = field
+    const focused = document.activeElement === element
+    const anchor = Y.createRelativePositionFromTypeIndex(text, element.selectionStart ?? 0)
+    const head = Y.createRelativePositionFromTypeIndex(text, element.selectionEnd ?? 0)
+    const before = text.toString()
+    Y.applyUpdate(doc, fromBase64(state), REMOTE)
+    const after = text.toString()
     if (before === after) return
 
-    editor.value = after
+    element.value = after
     if (focused) {
-      const start = Y.createAbsolutePositionFromRelativePosition(anchor, this.doc)?.index ?? after.length
-      const end = Y.createAbsolutePositionFromRelativePosition(head, this.doc)?.index ?? start
-      editor.setSelectionRange(start, end)
+      const start = Y.createAbsolutePositionFromRelativePosition(anchor, doc)?.index ?? after.length
+      const end = Y.createAbsolutePositionFromRelativePosition(head, doc)?.index ?? start
+      element.setSelectionRange(start, end)
     }
   }
 }

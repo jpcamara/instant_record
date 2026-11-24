@@ -32,6 +32,6 @@ class DraftsController < ApplicationController
   private
 
   def draft_params
-    params.require(:draft).permit(:title, :body, :body_ydoc)
+    params.require(:draft).permit(:title, :title_ydoc, :body, :body_ydoc)
   end
 end

@@ -4,14 +4,15 @@
   <header class="page-header">
     <h1>Drafts</h1>
     <p class="meta">
-      Open a draft in two browsers, take both offline, and edit the same
-      sentence. When they reconnect, the server merges the two texts.
+      Open a draft in two browsers, take both offline, and edit the title and
+      the same sentence. When they reconnect, the server merges each field.
     </p>
   </header>
 
   <div class="card">
-    <%= form_with url: drafts_path, method: :post, class: "draft-form", data: { turbo: false } do |f| %>
-      <%= f.text_field "draft[title]", placeholder: "New draft title", aria: { label: "New draft title" }, required: true %>
+    <%= form_with url: drafts_path, method: :post, class: "draft-form", data: { turbo: false, controller: "new-draft", action: "submit->new-draft#submit" } do |f| %>
+      <%= f.text_field "draft[title]", placeholder: "New draft title", aria: { label: "New draft title" }, required: true, data: { new_draft_target: "title" } %>
+      <%= f.hidden_field "draft[title_ydoc]", data: { new_draft_target: "state" } %>
       <%= f.submit "Create" %>
     <% end %>
 

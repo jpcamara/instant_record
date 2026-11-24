@@ -22,23 +22,25 @@ class DraftsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "div.page[data-controller=draft][data-instant-refresh]"
+    assert_select "input.draft-title[value=Plan]"
     assert_select "textarea.draft-editor", text: "Hello"
 
     get draft_url(draft, fragment: 1)
 
     assert_select "textarea", count: 0
-    assert_select "[data-state=?]", state
+    assert_select "[data-body-state=?]", state
   end
 
   test "update stores the document and answers with the stored state" do
     draft = Draft.create!(id: "d-1", title: "Plan")
-    state = state_with("Hello")
+    title = state_with("Plan B", name: "title")
+    body = state_with("Hello")
 
-    patch draft_url(draft), params: { draft: { body: "Hello", body_ydoc: state } }
+    patch draft_url(draft), params: { draft: { title: "Plan B", title_ydoc: title, body: "Hello", body_ydoc: body } }
 
     assert_response :success
-    assert_select "[data-state=?]", state
-    assert_equal "Hello", draft.reload.body
+    assert_select "[data-title-state=?][data-body-state=?]", title, body
+    assert_equal ["Plan B", "Hello"], draft.reload.values_at(:title, :body)
   end
 
   test "two offline edits to one draft both survive the sync" do
@@ -51,27 +53,40 @@ class DraftsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Please Ship it today", Draft.find("d-1").body
   end
 
+  test "offline edits to the title and the text all survive the sync" do
+    title = state_with("Plan", name: "title")
+    body = state_with("Ship it")
+    Draft.create!(id: "d-1", title: "Plan", title_ydoc: title, body: "Ship it", body_ydoc: body)
+
+    sync("m-a", edit(body) { |text| text.insert(7, " today") },
+      title_ydoc: edit(title, name: "title") { |text| text.insert(4, " B") })
+    sync("m-b", nil, title_ydoc: edit(title, name: "title") { |text| text.insert(0, "Launch ") })
+
+    assert_equal ["Launch Plan B", "Ship it today"], Draft.find("d-1").values_at(:title, :body)
+  end
+
   private
 
-  def sync(id, state)
+  def sync(id, body_ydoc, **changes)
+    changes[:body_ydoc] = body_ydoc if body_ydoc
     post "/instant_record/mutations", as: :json, params: { mutations: [
       { id: id, record_type: "Draft", record_id: "d-1", operation: "update", base_version: 0,
-        changes: { body_ydoc: state } }
+        changes: changes }
     ] }
     assert_equal "applied", response.parsed_body.dig("results", 0, "status")
   end
 
-  def state_with(string)
+  def state_with(string, name: "body")
     doc = Y::Doc.new
-    doc.get_text("body").insert(0, string)
+    doc.get_text(name).insert(0, string)
     Base64.strict_encode64(doc.encode_state_as_update)
   end
 
-  # Another browser's copy of `state`, edited by the block.
-  def edit(state)
+  # Another browser's copy of `state`, with the block editing its Y.Text `name`.
+  def edit(state, name: "body")
     doc = Y::Doc.new
     doc.apply_update(Base64.strict_decode64(state))
-    yield doc.get_text("body")
+    yield doc.get_text(name)
     Base64.strict_encode64(doc.encode_state_as_update)
   end
 end

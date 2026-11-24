@@ -1,5 +1,5 @@
-// Drafts: browsers edit one text, online and offline, and every edit survives
-// the merge. Each scenario starts its own draft.
+// Drafts: browsers edit a draft's title and text, online and offline, and
+// every edit survives the merge. Each scenario starts its own draft.
 //
 //   node compiled/test/drafts.mjs <origin of the compiled site>
 import assert from "node:assert/strict";
@@ -12,17 +12,23 @@ const PLAN = "Ship the beta on Friday.\nTell the support team.\nWrite the releas
 
 const ready = page => page.waitForFunction(() => window.Stimulus?.controllers.some(c => c.identifier === "draft"));
 const editor = page => page.locator("textarea.draft-editor");
+const titleField = page => page.locator("input.draft-title");
 const text = page => editor(page).inputValue();
+const title = page => titleField(page).inputValue();
 const offline = (page, on) => page.locator("[data-inspector-target=offline]").setChecked(on);
 async function serverText(path) {
   const html = await (await fetch(RAILS + path)).text();
   return html.match(/">([^<]*)<\/textarea>/)[1];
 }
+async function serverTitle(path) {
+  const html = await (await fetch(RAILS + path)).text();
+  return html.match(/class="draft-title"[^>]*value="([^"]*)"/)[1];
+}
 
 // Puts the cursor before `anchor`, or after it, and types `typed` there.
-async function typeAt(page, anchor, typed, { after = false } = {}) {
-  await editor(page).click();
-  await editor(page).evaluate((el, [anchor, after]) => {
+async function typeAt(page, anchor, typed, { after = false, field = editor } = {}) {
+  await field(page).click();
+  await field(page).evaluate((el, [anchor, after]) => {
     const at = el.value.indexOf(anchor) + (after ? anchor.length : 0);
     el.setSelectionRange(at, at);
   }, [anchor, after]);
@@ -134,6 +140,24 @@ try {
   await settles("an edit kept over a reload", path, [a, b],
     "Please Ship the beta on Friday.\nTell the whole support team.\nWrite the release notes.");
   console.log("5. An offline edit survives a reload and merges when the browser reconnects.");
+
+  // 6. Offline, edits to the title and the text all survive.
+  path = await start("Fields", PLAN, a, b);
+  const named = await title(a);
+  await offline(a, true);
+  await offline(b, true);
+  await typeAt(a, named, " (draft)", { after: true, field: titleField });
+  await typeAt(a, "Friday", " at noon", { after: true });
+  await typeAt(b, named, "Q3 ", { field: titleField });
+  await typeAt(b, "release notes", " and the blog post", { after: true });
+  await offline(a, false);
+  await offline(b, false);
+  await settles("edits to the text", path, [a, b],
+    "Ship the beta on Friday at noon.\nTell the support team.\nWrite the release notes and the blog post.");
+  const both = `Q3 ${named} (draft)`;
+  await until("Rails: edits to the title", async () => (await serverTitle(path)) === both);
+  for (const page of [a, b]) await until("page: edits to the title", async () => (await title(page)) === both);
+  console.log("6. Offline edits to the title and the text all survive.");
 } finally {
   await browser.close();
 }
