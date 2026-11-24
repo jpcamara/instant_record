@@ -491,7 +491,7 @@ Exposed MCP tools (`<1ms` offline against local SQLite + persistent compiled `ho
 
 ## Running the demo
 
-Install Ruby 3.3.3, PostgreSQL and the [compiler toolchain](compiled/README.md#install-the-toolchain).
+Install Ruby 3.4.7, PostgreSQL and the [compiler toolchain](compiled/README.md#install-the-toolchain).
 Copy `compiled/toolchain.env.example` to `compiled/toolchain.env` and fill in the tool paths.
 
 ```sh
