@@ -1,12 +1,20 @@
-# One draft to open, with its text already in a Yjs document.
+# Two drafts to open, each with its text already in a Yjs document.
 module Drafts
-  def self.apply
-    return if Draft.exists?(id: "launch-plan")
+  EXAMPLES = {
+    "launch-plan" => ["Launch plan", "Ship the beta on Friday.\nTell the support team.\nWrite the release notes."],
+    "meeting-agenda" => ["Meeting agenda", "Agenda:\n- Welcome"]
+  }.freeze
 
+  def self.apply
     require "yrby"
-    doc = Y::Doc.new
-    doc.get_text("body").insert(0, "Ship it")
-    Draft.create!(id: "launch-plan", title: "Launch plan", body: "Ship it",
-      body_ydoc: Base64.strict_encode64(doc.encode_state_as_update))
+
+    EXAMPLES.each do |id, (title, text)|
+      next if Draft.exists?(id: id)
+
+      doc = Y::Doc.new
+      doc.get_text("body").insert(0, text)
+      Draft.create!(id: id, title: title, body: text,
+        body_ydoc: Base64.strict_encode64(doc.encode_state_as_update))
+    end
   end
 end
