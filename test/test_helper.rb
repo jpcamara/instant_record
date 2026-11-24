@@ -33,6 +33,7 @@ ActiveRecord::Schema.define do
     t.string :owner
     t.text :body
     t.text :body_ydoc
+    t.text :title_ydoc
     t.integer :server_version, null: false, default: 0
     t.string :sync_state, null: false, default: "synced"
     t.timestamps
