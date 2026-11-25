@@ -39,6 +39,20 @@ class YjsMergeTest < Minitest::Test
     assert_equal "Please Ship it today", YjsMergeTest.text_of(record.body_ydoc)
   end
 
+  def test_a_write_missing_stored_edits_is_answered_with_the_merged_record
+    base = doc_with("Ship it")
+    create_note(base)
+    update_note("m-b", copy_of(base) { |text| text.insert(0, "Please ") }, base_version: 1, at: @t0 + 10)
+
+    # A has seen version 2, and still sends a document without its edit.
+    a = copy_of(base) { |text| text.insert(7, " today") }
+    result = update_note("m-a", a, base_version: 2, at: @t0 + 20)
+
+    assert_equal "applied", result[:status]
+    assert_equal "Please Ship it today", result[:server_attributes]["body"]
+    assert_equal @model.find("n-1").body_ydoc, result[:server_attributes]["body_ydoc"]
+  end
+
   def test_a_write_older_than_the_record_still_merges_its_edits
     base = doc_with("Notes")
     create_note(base)

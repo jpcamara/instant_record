@@ -319,7 +319,11 @@ module InstantRecord
       permit!(model)
       HLC.receive(incoming_hlc, now: server_now, node: HLC::SERVER_NODE)
       log_change(record, "update", hlc: incoming_hlc)
-      { status: "applied", version: record.server_version, hlc: incoming_hlc }
+      result = { status: "applied", version: record.server_version, hlc: incoming_hlc }
+      # A :yjs column now holds the merge, which can carry edits the sender
+      # has not seen, so the answer says what was stored.
+      result[:server_attributes] = InstantRecord.wire_attributes(record.attributes) if yjs_changes?(model)
+      result
     end
 
     def perform_three_way_merge(model, record, user_columns, base_version, incoming_hlc, record_hlc, server_now)
@@ -474,6 +478,10 @@ module InstantRecord
     # The :yjs columns this write changes.
     def yjs_changes(model, record)
       @changes.slice(*yjs_columns(model)).reject { |column, state| state == record[column] }
+    end
+
+    def yjs_changes?(model)
+      yjs_columns(model).intersect?(@changes.keys)
     end
 
     def yjs_columns(model)
