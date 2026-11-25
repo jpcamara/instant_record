@@ -22,7 +22,10 @@ class DraftsController < ApplicationController
 
   def update
     draft = Draft.find(params[:id])
-    draft.update!(draft_params)
+    # The form saves as you type. A save with the title empty is refused, and
+    # the form saves again on the next edit.
+    return head :unprocessable_entity unless draft.update(draft_params)
+
     redirect_to draft_path(draft)
   end
 

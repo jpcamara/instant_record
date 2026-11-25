@@ -13,7 +13,8 @@ gem "instant_record", path: ".."
 git "https://github.com/jpcamara/yrby.git", branch: "feat/yrby-forms" do
   # Merges the Drafts demo's Yjs documents on the server (sync_merge :yjs).
   gem "yrby"
-  # Fills a draft's title and text from its Yjs document (has_collaborative_fields).
+  # Fills a draft's title and text from its Yjs document (sync_merge fields:),
+  # and ships the form's scripts.
   gem "yrby-forms"
 end
 

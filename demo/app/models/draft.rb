@@ -5,11 +5,7 @@
 class Draft < ApplicationRecord
   include InstantRecord::Syncable
 
-  sync_merge :fields_ydoc, :yjs
-
-  server_only do
-    has_collaborative_fields :title, :body, column: :fields_ydoc
-  end
+  sync_merge :fields_ydoc, :yjs, fields: %i[title body]
 
   validates :title, presence: true, length: { maximum: 120 }
 end

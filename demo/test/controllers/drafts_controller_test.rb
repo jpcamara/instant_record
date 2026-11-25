@@ -37,6 +37,15 @@ class DraftsControllerTest < ActionDispatch::IntegrationTest
     assert_equal ["Plan B", "Ship it today"], draft.reload.values_at(:title, :body)
   end
 
+  test "update refuses a save that leaves the draft invalid" do
+    draft = Draft.create!(id: "d-1", title: "Plan", body: "Ship it")
+
+    patch draft_url(draft), params: { draft: { title: "", body: "Ship it today" } }
+
+    assert_response :unprocessable_entity
+    assert_equal ["Plan", "Ship it"], draft.reload.values_at(:title, :body)
+  end
+
   test "two offline edits to one draft both survive the sync" do
     base = Draft.create!(id: "d-1", title: "Plan", body: "Ship it").fields_ydoc
 
