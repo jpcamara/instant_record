@@ -13,6 +13,10 @@
 
 .demo-drafts .draft-form input[type="text"] { flex: 1; min-width: 0; }
 
+/* The yrby-forms elements around the fields take no box of their own. */
+.demo-drafts collaborative-fields,
+.demo-drafts collaborative-field { display: contents; }
+
 .demo-drafts .drafts { list-style: none; margin: 0; padding: 0; }
 
 .demo-drafts .drafts li { padding: 12px 18px; border-bottom: 1px solid var(--hairline-soft); }

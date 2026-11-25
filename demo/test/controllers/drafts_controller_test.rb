@@ -6,87 +6,82 @@ class DraftsControllerTest < ActionDispatch::IntegrationTest
     get drafts_url
 
     assert_response :success
-    assert_select "form.draft-form"
+    assert_select "form.draft-form collaborative-fields[name=?]", "draft[fields_ydoc]"
 
     post drafts_url, params: { draft: { title: "Notes" } }
 
     draft = Draft.find_by!(title: "Notes")
     assert_redirected_to draft_url(draft)
+    assert_equal "Notes", text_of(draft.fields_ydoc, "title")
   end
 
-  test "show renders the editor, and with ?fragment=1 only the stored state" do
-    state = state_with("Hello")
-    draft = Draft.create!(id: "d-1", title: "Plan", body: "Hello", body_ydoc: state)
+  test "show renders the form around the draft's document" do
+    draft = Draft.create!(id: "d-1", title: "Plan", body: "Hello")
 
     get draft_url(draft)
 
     assert_response :success
-    assert_select "div.page[data-controller=draft][data-instant-refresh]"
-    assert_select "input.draft-title[value=Plan]"
-    assert_select "textarea.draft-editor", text: "Hello"
-
-    get draft_url(draft, fragment: 1)
-
-    assert_select "textarea", count: 0
-    assert_select "[data-body-state=?]", state
+    assert_select "collaborative-fields[autosave][name=?][value=?]", "draft[fields_ydoc]", draft.fields_ydoc
+    assert_select "collaborative-field[name=title] input.draft-title[value=Plan]"
+    assert_select "collaborative-field[name=body] textarea.draft-editor", text: "Hello"
   end
 
-  test "update stores the document and answers with the stored state" do
-    draft = Draft.create!(id: "d-1", title: "Plan")
-    title = state_with("Plan B", name: "title")
-    body = state_with("Hello")
+  test "update merges the posted document and fills the fields from it" do
+    draft = Draft.create!(id: "d-1", title: "Plan", body: "Ship it")
+    posted = edit(draft.fields_ydoc) { |doc| doc.get_text("fields/title").insert(4, " B") }
+    draft.update!(fields_ydoc: edit(draft.fields_ydoc) { |doc| doc.get_text("fields/body").insert(7, " today") })
 
-    patch draft_url(draft), params: { draft: { title: "Plan B", title_ydoc: title, body: "Hello", body_ydoc: body } }
+    patch draft_url(draft), params: { draft: { title: "Plan B", body: "Ship it", fields_ydoc: posted } }
 
-    assert_response :success
-    assert_select "[data-title-state=?][data-body-state=?]", title, body
-    assert_equal ["Plan B", "Hello"], draft.reload.values_at(:title, :body)
+    assert_redirected_to draft_url(draft)
+    assert_equal ["Plan B", "Ship it today"], draft.reload.values_at(:title, :body)
   end
 
   test "two offline edits to one draft both survive the sync" do
-    base = state_with("Ship it")
-    Draft.create!(id: "d-1", title: "Plan", body: "Ship it", body_ydoc: base)
+    base = Draft.create!(id: "d-1", title: "Plan", body: "Ship it").fields_ydoc
 
-    sync("m-a", edit(base) { |text| text.insert(7, " today") })
-    sync("m-b", edit(base) { |text| text.insert(0, "Please ") })
+    sync("m-a", edit(base) { |doc| doc.get_text("fields/body").insert(7, " today") })
+    sync("m-b", edit(base) { |doc| doc.get_text("fields/body").insert(0, "Please ") })
 
     assert_equal "Please Ship it today", Draft.find("d-1").body
   end
 
   test "offline edits to the title and the text all survive the sync" do
-    title = state_with("Plan", name: "title")
-    body = state_with("Ship it")
-    Draft.create!(id: "d-1", title: "Plan", title_ydoc: title, body: "Ship it", body_ydoc: body)
+    base = Draft.create!(id: "d-1", title: "Plan", body: "Ship it").fields_ydoc
 
-    sync("m-a", edit(body) { |text| text.insert(7, " today") },
-      title_ydoc: edit(title, name: "title") { |text| text.insert(4, " B") })
-    sync("m-b", nil, title_ydoc: edit(title, name: "title") { |text| text.insert(0, "Launch ") })
+    sync("m-a", edit(base) do |doc|
+      doc.get_text("fields/title").insert(4, " B")
+      doc.get_text("fields/body").insert(7, " today")
+    end)
+    sync("m-b", edit(base) { |doc| doc.get_text("fields/title").insert(0, "Launch ") })
 
     assert_equal ["Launch Plan B", "Ship it today"], Draft.find("d-1").values_at(:title, :body)
   end
 
   private
 
-  def sync(id, body_ydoc, **changes)
-    changes[:body_ydoc] = body_ydoc if body_ydoc
+  # A browser's synced write. It sends the document and the title it had on
+  # screen, and the server reads the title from the merged document.
+  def sync(id, fields_ydoc)
     post "/instant_record/mutations", as: :json, params: { mutations: [
       { id: id, record_type: "Draft", record_id: "d-1", operation: "update", base_version: 0,
-        changes: changes }
+        changes: { fields_ydoc: fields_ydoc, title: text_of(fields_ydoc, "title") } }
     ] }
     assert_equal "applied", response.parsed_body.dig("results", 0, "status")
   end
 
-  def state_with(string, name: "body")
-    doc = Y::Doc.new
-    doc.get_text(name).insert(0, string)
+  def text_of(state, field)
+    load_doc(state).read_text("fields/#{field}")
+  end
+
+  # Another browser's copy of `state`, with the block editing it.
+  def edit(state)
+    doc = load_doc(state)
+    yield doc
     Base64.strict_encode64(doc.encode_state_as_update)
   end
 
-  # Another browser's copy of `state`, with the block editing its Y.Text `name`.
-  def edit(state, name: "body")
-    doc = Y::Doc.new
-    doc.apply_update(Base64.strict_decode64(state))
-    yield doc.get_text(name)
-    Base64.strict_encode64(doc.encode_state_as_update)
+  def load_doc(state)
+    Y::Doc.new.tap { |doc| doc.apply_update(Base64.strict_decode64(state)) }
   end
 end

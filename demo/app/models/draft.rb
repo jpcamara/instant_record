@@ -1,12 +1,15 @@
-# A title and a text two people can edit offline at once. The page keeps each
-# field as a Yjs document and saves their whole states in `title_ydoc` and
-# `body_ydoc`. The server merges each save into what it holds, so edits made
-# apart all survive, and fills `title` and `body` from the result.
+# A title and a text two people can edit offline at once. The form keeps both
+# in one Yjs document and saves its whole state in `fields_ydoc`. The server
+# merges each save into the document it holds, so edits made apart all
+# survive, and yrby-forms fills `title` and `body` from the result.
 class Draft < ApplicationRecord
   include InstantRecord::Syncable
 
-  sync_merge :title_ydoc, :yjs, text: :title
-  sync_merge :body_ydoc, :yjs, text: :body
+  sync_merge :fields_ydoc, :yjs
+
+  server_only do
+    has_collaborative_fields :title, :body, column: :fields_ydoc
+  end
 
   validates :title, presence: true, length: { maximum: 120 }
 end

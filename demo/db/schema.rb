@@ -71,12 +71,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_23_000100) do
 
   create_table "drafts", id: :string, force: :cascade do |t|
     t.text "body", default: "", null: false
-    t.text "body_ydoc"
     t.datetime "created_at", null: false
+    t.text "fields_ydoc"
     t.integer "server_version", default: 0, null: false
     t.string "sync_state", default: "synced", null: false
     t.string "title", null: false
-    t.text "title_ydoc"
     t.datetime "updated_at", null: false
   end
 

@@ -10,7 +10,7 @@ const origin = process.argv[2];
 const browser = await chromium.launch();
 const PLAN = "Ship the beta on Friday.\nTell the support team.\nWrite the release notes.";
 
-const ready = page => page.waitForFunction(() => window.Stimulus?.controllers.some(c => c.identifier === "draft"));
+const ready = page => page.waitForFunction(() => document.querySelector("collaborative-fields[autosave]")?.current);
 const editor = page => page.locator("textarea.draft-editor");
 const titleField = page => page.locator("input.draft-title");
 const text = page => editor(page).inputValue();
@@ -18,11 +18,11 @@ const title = page => titleField(page).inputValue();
 const offline = (page, on) => page.locator("[data-inspector-target=offline]").setChecked(on);
 async function serverText(path) {
   const html = await (await fetch(RAILS + path)).text();
-  return html.match(/">([^<]*)<\/textarea>/)[1];
+  return html.match(/<textarea[^>]*>\n?([^<]*)<\/textarea>/)[1];
 }
 async function serverTitle(path) {
   const html = await (await fetch(RAILS + path)).text();
-  return html.match(/class="draft-title"[^>]*value="([^"]*)"/)[1];
+  return html.match(/<input[^>]*class="draft-title"[^>]*>/)[0].match(/value="([^"]*)"/)[1];
 }
 
 // Puts the cursor before `anchor`, or after it, and types `typed` there.
@@ -94,7 +94,7 @@ try {
   await offline(b, true);
   await replace(a, "Friday", "Thursday");
   await typeAt(b, "release notes", " and the blog post", { after: true });
-  await sleep(1000); // past the editor's 300 ms save delay
+  await sleep(1000); // past the form's 300 ms save delay
   assert.equal(await serverText(path), PLAN, "offline edits stay in the browser");
   await offline(a, false);
   await offline(b, false);

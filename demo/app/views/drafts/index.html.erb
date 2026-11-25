@@ -10,9 +10,12 @@
   </header>
 
   <div class="card">
-    <%= form_with url: drafts_path, method: :post, class: "draft-form", data: { turbo: false, controller: "new-draft", action: "submit->new-draft#submit" } do |f| %>
-      <%= f.text_field "draft[title]", placeholder: "New draft title", aria: { label: "New draft title" }, required: true, data: { new_draft_target: "title" } %>
-      <%= f.hidden_field "draft[title_ydoc]", data: { new_draft_target: "state" } %>
+    <%= form_with url: drafts_path, method: :post, class: "draft-form", data: { turbo: false } do |f| %>
+      <collaborative-fields name="draft[fields_ydoc]">
+        <collaborative-field name="title" tier="text">
+          <%= f.text_field "draft[title]", placeholder: "New draft title", aria: { label: "New draft title" }, required: true %>
+        </collaborative-field>
+      </collaborative-fields>
       <%= f.submit "Create" %>
     <% end %>
 
