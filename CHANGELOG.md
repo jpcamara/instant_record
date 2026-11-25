@@ -3,6 +3,7 @@
 ## Unreleased
 
 - **Yjs columns (`sync_merge :col, :yjs`).** A column can hold a Yjs document (its state as a Base64 update). The server merges each write into the stored document with [yrby](https://github.com/jpcamara/yrby) instead of choosing a winner, so concurrent and offline edits to the same text all survive, including writes older than the record. yrby is required only when a model declares a `:yjs` column.
+- The compiled site now includes scripts an import-map pin takes from a gem's asset folders, as it already did for Turbo and Stimulus.
 - Added the Drafts demo (`/drafts`), where browsers edit a draft's title and text offline and every edit survives the sync (`sync_merge :fields_ydoc, :yjs` under a yrby-forms form), with a compiled browser test (`compiled/test/drafts.mjs`).
 
 ## 0.3.0 (2026-11-21)

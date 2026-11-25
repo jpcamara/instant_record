@@ -772,6 +772,36 @@ class CompilerTest < ActiveSupport::TestCase
     end
   end
 
+  test "WasmBuild copies a pinned script from a gem's assets unless the app holds one" do
+    Dir.mktmpdir do |dir|
+      fake = create_fake_toolchain(dir)
+      assets = File.join(dir, "dist/assets")
+      gem_assets = File.join(dir, "widgets-1.0/app/assets/javascript")
+      FileUtils.mkdir_p(File.join(assets, "controllers"))
+      FileUtils.mkdir_p(File.join(gem_assets, "widgets"))
+      File.write(File.join(assets, "application.js"), "// app\n")
+      File.write(File.join(gem_assets, "application.js"), "// gem\n")
+      File.write(File.join(gem_assets, "widgets/widget.js"), "// widget\n")
+      importmap = File.join(dir, "importmap.rb")
+      File.write(importmap, <<~RUBY)
+        [{ name: "application", path: "/assets/application.js" },
+         { name: "widget", path: "/assets/widgets/widget.js?v=1" },
+         { name: "missing", path: "/assets/missing.js" }]
+      RUBY
+
+      build = InstantRecord::Compiler::WasmBuild.new(
+        workspace: dir,
+        gem_root: File.expand_path("..", __dir__),
+        toolchain: fake[:toolchain_file]
+      )
+      build.send(:copy_pinned_gem_assets, assets, importmap, gem_roots: [File.join(dir, "widgets-1.0")])
+
+      assert_equal "// widget\n", File.read(File.join(assets, "widgets/widget.js"))
+      assert_equal "// app\n", File.read(File.join(assets, "application.js"))
+      refute File.exist?(File.join(assets, "missing.js"))
+    end
+  end
+
   test "WasmBuild#inject_preloads keeps core CSS as low-priority preloads and defers extra stylesheets" do
     Dir.mktmpdir do |dir|
       fake = create_fake_toolchain(dir)
