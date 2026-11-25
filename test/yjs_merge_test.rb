@@ -7,7 +7,11 @@ class YjsMergeTest < Minitest::Test
   def setup
     reset_instant_record_tables!
     @t0 = Time.utc(2026, 11, 23, 12, 0, 0, 0)
-    @model = syncable_model("Note") { sync_merge :body_ydoc, :yjs, text: :body }
+    # The model fills a plain column from the merged document, as an app would.
+    @model = syncable_model("Note") do
+      sync_merge :body_ydoc, :yjs
+      before_save { self.body = YjsMergeTest.text_of(body_ydoc) }
+    end
     InstantRecord.sync(@model)
   end
 
@@ -32,7 +36,7 @@ class YjsMergeTest < Minitest::Test
 
     record = @model.find("n-1")
     assert_equal "Please Ship it today", record.body
-    assert_equal "Please Ship it today", text_of(record.body_ydoc)
+    assert_equal "Please Ship it today", YjsMergeTest.text_of(record.body_ydoc)
   end
 
   def test_a_write_older_than_the_record_still_merges_its_edits
@@ -49,22 +53,10 @@ class YjsMergeTest < Minitest::Test
     assert_operator result[:hlc], :>, res_new[:hlc], "the merge is stamped after the write it merged into"
   end
 
-  def test_create_fills_the_text_column_from_the_document
+  def test_a_create_saves_the_document_so_the_models_callback_reads_it
     create_note(doc_with("Hello"))
 
     assert_equal "Hello", @model.find("n-1").body
-  end
-
-  def test_the_text_column_comes_from_the_document_not_the_client
-    base = doc_with("Real")
-    create_note(base)
-
-    update_note("m-text", nil, at: @t0 + 5, extra: { "body" => "Forged" })
-    assert_equal "Real", @model.find("n-1").body
-
-    edited = copy_of(base) { |text| text.insert(4, "ly") }
-    update_note("m-both", edited, at: @t0 + 6, extra: { "body" => "Forged" })
-    assert_equal "Really", @model.find("n-1").body
   end
 
   def test_a_state_that_is_not_a_yjs_update_is_rejected
@@ -79,8 +71,8 @@ class YjsMergeTest < Minitest::Test
 
   def test_two_yjs_columns_on_one_record_each_keep_every_edit
     @model = syncable_model("Note") do
-      sync_merge :title_ydoc, :yjs, text: :title
-      sync_merge :body_ydoc, :yjs, text: :body
+      sync_merge :title_ydoc, :yjs
+      sync_merge :body_ydoc, :yjs
     end
     InstantRecord.sync(@model)
     title = doc_with("Plan", name: "title")
@@ -96,8 +88,8 @@ class YjsMergeTest < Minitest::Test
     update_note("m-b", nil, at: @t0 + 20, extra: { "title_ydoc" => b_title })
 
     record = @model.find("n-1")
-    assert_equal "Launch Plan B", record.title
-    assert_equal "Ship it today", record.body
+    assert_equal "Launch Plan B", YjsMergeTest.text_of(record.title_ydoc, "title")
+    assert_equal "Ship it today", YjsMergeTest.text_of(record.body_ydoc)
   end
 
   def test_maps_arrays_and_xml_in_one_document_all_merge
@@ -140,9 +132,11 @@ class YjsMergeTest < Minitest::Test
     assert_equal "done", record.state, "the plain column is last-write-wins"
   end
 
-  def test_text_is_only_for_yjs_columns
-    error = assert_raises(ArgumentError) { syncable_model("Bad") { sync_merge :title, :lww, text: :body } }
-    assert_match(/only to :yjs/, error.message)
+  # The Y.Text called `name` in a stored state.
+  def self.text_of(state, name = "body")
+    doc = Y::Doc.new
+    doc.apply_update(Base64.strict_decode64(state))
+    doc.read_text(name).to_s
   end
 
   private
@@ -187,11 +181,5 @@ class YjsMergeTest < Minitest::Test
     doc.apply_update(Base64.strict_decode64(state))
     yield doc
     Base64.strict_encode64(doc.encode_state_as_update)
-  end
-
-  def text_of(state)
-    doc = Y::Doc.new
-    doc.apply_update(Base64.strict_decode64(state))
-    doc.read_text("body").to_s
   end
 end

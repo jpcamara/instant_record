@@ -245,29 +245,16 @@ module InstantRecord
       #   :server_wins - server's already-committed value wins on collision
       #   :yjs         - the column holds a Yjs document (its state as a Base64
       #                  update), and the server merges every write into it, so
-      #                  concurrent and offline edits all survive. `text:` names
-      #                  a column the server fills with the document's Y.Text of
-      #                  that name, for views and queries. Needs the yrby gem on
-      #                  the server.
-      def sync_merge(column, policy, text: nil)
+      #                  concurrent and offline edits all survive. Needs the
+      #                  yrby gem on the server.
+      def sync_merge(column, policy)
         policy = policy.to_sym
         unless %i[lww union server_wins yjs].include?(policy)
           raise ArgumentError, "Unknown sync_merge policy #{policy.inspect}; expected :lww, :union, :server_wins, or :yjs"
         end
-        raise ArgumentError, "text: applies only to :yjs columns" if text && policy != :yjs
 
         @instant_record_merge_policies ||= {}
         @instant_record_merge_policies[column.to_s] = policy
-        if policy == :yjs
-          @instant_record_yjs_columns ||= {}
-          @instant_record_yjs_columns[column.to_s] = text ? text.to_s : nil
-        end
-      end
-
-      # { "body_ydoc" => "body" }: each :yjs column and the text column it fills.
-      def instant_record_yjs_columns
-        parent = superclass.respond_to?(:instant_record_yjs_columns) ? superclass.instant_record_yjs_columns : {}
-        @instant_record_yjs_columns ? parent.merge(@instant_record_yjs_columns) : parent
       end
 
       def instant_record_merge_policies
