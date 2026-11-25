@@ -171,17 +171,17 @@ class Issue < ApplicationRecord
 end
 ```
 
-A `:yjs` column holds a [Yjs](https://yjs.dev) document, so text that two people edit at once, or offline, keeps both edits. The column stores the document state as a Base64 update, and the server merges every write into what it holds instead of choosing one. `text:` names a column the server fills with the document's `Y.Text` of that name, for views and queries. The server needs the [yrby](https://github.com/jpcamara/yrby) gem.
+A `:yjs` column holds a [Yjs](https://yjs.dev) document, so text that two people edit at once, or offline, keeps both edits. The column stores the document state as a Base64 update, and the server merges every write into what it holds instead of choosing one. The server needs the [yrby](https://github.com/jpcamara/yrby) gem.
 
 ```ruby
 class Issue < ApplicationRecord
   include InstantRecord::Syncable
 
-  sync_merge :description_ydoc, :yjs, text: :description
+  sync_merge :description_ydoc, :yjs
 end
 ```
 
-In the browser, an editor keeps the Yjs document and writes its whole state to the column. Each write holds everything that tab has seen, so the server always ends with the union. The text column comes only from the document, so a write to it alone is dropped.
+In the browser, an editor keeps the Yjs document and writes its whole state to the column. Each write holds everything that tab has seen, so the server always ends with the union. The record is saved with the merged state, so a `before_save` callback can read the document and fill plain columns from it for views and queries.
 
 #### Server-only controller behavior: auth and scoping
 

@@ -327,14 +327,8 @@ module InstantRecord
       live_attrs = InstantRecord.wire_attributes(record.attributes)
       incoming_node = HLC.node(incoming_hlc)
 
-      yjs_columns = model.instant_record_yjs_columns
-      text_columns = yjs_columns.values.compact
-
       winning = {}
       user_columns.each do |col|
-        # A :yjs column's text column follows its document, after this loop.
-        next if text_columns.include?(col)
-
         col_info =
           if has_base
             server_touched[col]
@@ -376,10 +370,6 @@ module InstantRecord
           # Already merged with the stored state, so it holds both sides.
           winning[col] = @changes[col] if @changes[col] != record.public_send(col)
         end
-      end
-
-      yjs_columns.each do |col, text_col|
-        winning[text_col] = @changes[text_col] if text_col && winning.key?(col)
       end
 
       return skipped_result(record, record_hlc) if winning.empty?
@@ -470,33 +460,24 @@ module InstantRecord
         HLC.compare(incoming_hlc, col_info[:hlc]) > 0
     end
 
-    # Replaces each incoming :yjs state with its merge into the stored one, and
-    # fills the column's text column from the result. A write to a text column
-    # without its document is dropped: the text always comes from the document.
+    # Replaces each incoming :yjs state with its merge into the stored one.
     def merge_yjs_columns!(model)
-      columns = model.instant_record_yjs_columns
+      columns = yjs_columns(model) & @changes.keys
       return if columns.empty?
 
       stored = model.find_by(id: @mutation[:record_id]) if @mutation[:operation] == "update"
-      columns.each do |column, text_column|
-        if @changes.key?(column)
-          merged, doc = YjsMerge.merge(stored && stored[column], @changes[column])
-          @changes[column] = merged
-          @changes[text_column] = YjsMerge.text(doc, text_column) if text_column
-        elsif text_column
-          @changes.delete(text_column)
-        end
+      columns.each do |column|
+        @changes[column] = YjsMerge.merge(stored && stored[column], @changes[column])
       end
     end
 
-    # The :yjs columns (and their text columns) this write changes.
+    # The :yjs columns this write changes.
     def yjs_changes(model, record)
-      model.instant_record_yjs_columns.each_with_object({}) do |(column, text_column), changes|
-        next unless @changes.key?(column) && @changes[column] != record[column]
+      @changes.slice(*yjs_columns(model)).reject { |column, state| state == record[column] }
+    end
 
-        changes[column] = @changes[column]
-        changes[text_column] = @changes[text_column] if text_column
-      end
+    def yjs_columns(model)
+      model.instant_record_merge_policies.select { |_column, policy| policy == :yjs }.keys
     end
 
     # 3-way collection union for `sync_merge :col, :union`:

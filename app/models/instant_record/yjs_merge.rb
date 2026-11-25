@@ -13,8 +13,7 @@ module InstantRecord
 
     module_function
 
-    # The merged state of every given Base64 state, Base64-encoded, and the
-    # merged document.
+    # The merged state of every given Base64 state, Base64-encoded.
     def merge(*states)
       doc = new_doc
       states.each do |state|
@@ -26,12 +25,7 @@ module InstantRecord
           raise Invalid, "not a Yjs update: #{e.message}"
         end
       end
-      [Base64.strict_encode64(doc.encode_state_as_update), doc]
-    end
-
-    # The document's Y.Text called `name`, as a plain String.
-    def text(doc, name)
-      doc.read_text(name).to_s
+      Base64.strict_encode64(doc.encode_state_as_update)
     end
 
     def new_doc
