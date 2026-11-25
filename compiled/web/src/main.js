@@ -217,16 +217,19 @@ function recordsChanged(changes, reads) {
 // the page, Turbo draws it again in place: a visit to the address it is on, answered by the
 // app in this browser. A whole reload would start the app again, after every write the page
 // itself made. Turbo refreshes nothing while a visit is under way, so this waits for its end.
+// Turbo still holds the visit while it fires turbo:load, so the redraw runs in the next task.
 function redraw() {
   const turbo = window.Turbo?.session;
   if (!turbo?.refresh) return window.location.reload();
-  if (turbo.navigator.currentVisit) return document.addEventListener("turbo:load", redraw, { once: true });
+  if (turbo.navigator.currentVisit) return document.addEventListener("turbo:load", redrawNext, { once: true });
   // Morphed, so the scroll stays where it is, and the field being typed in is left out of the
   // morph: the page as the app draws it has that field empty, and the letters are the person's.
   redrawing = true;
   setTimeout(() => { redrawing = false; }, 2000);
   turbo.refresh(document.baseURI, { method: "morph", scroll: "preserve" });
 }
+
+const redrawNext = () => setTimeout(redraw);
 
 let redrawing = false;
 function keepTyping(event) {
