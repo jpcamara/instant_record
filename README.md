@@ -155,7 +155,7 @@ Useful helpers:
 - `InstantRecord.server_url(path)` — the URL that reaches the authoritative server from either runtime, honouring a customised `mount_path`
 - `sync_file` — a record that carries a file, kept in the browser and sent to the server in the background (below)
 
-Convergence uses server-anchored string-encoded Hybrid Logical Clocks (HLCs) and 3-way column-level merging via `base_version`: disjoint concurrent column edits merge cleanly, while same-column collisions honor declarative `sync_merge` policies (`:lww` default, `:union`, or `:server_wins`). A model can also observe remote values dropped on the client:
+Convergence uses server-anchored string-encoded Hybrid Logical Clocks (HLCs) and 3-way column-level merging via `base_version`: disjoint concurrent column edits merge cleanly, while same-column collisions honor declarative `sync_merge` policies (`:lww` default, `:union`, `:server_wins`, or `:yjs`). A model can also observe remote values dropped on the client:
 
 ```ruby
 class Issue < ApplicationRecord
@@ -170,6 +170,18 @@ class Issue < ApplicationRecord
   on_discarded_change { |attributes| Rails.logger.info("dropped #{attributes["title"].inspect}") }
 end
 ```
+
+A `:yjs` column holds a [Yjs](https://yjs.dev) document, so text that two people edit at once, or offline, keeps both edits. The column stores the document state as a Base64 update, and the server merges every write into what it holds instead of choosing one. The server needs the [yrby](https://github.com/jpcamara/yrby) gem.
+
+```ruby
+class Issue < ApplicationRecord
+  include InstantRecord::Syncable
+
+  sync_merge :description_ydoc, :yjs
+end
+```
+
+In the browser, an editor keeps the Yjs document and writes its whole state to the column. Each write holds everything that tab has seen, so the server always ends with the union. The record is saved with the merged state, so a `before_save` callback can read the document and fill plain columns from it for views and queries.
 
 #### Server-only controller behavior: auth and scoping
 
@@ -479,7 +491,7 @@ Exposed MCP tools (`<1ms` offline against local SQLite + persistent compiled `ho
 
 ## Running the demo
 
-Install Ruby 3.3.3, PostgreSQL and the [compiler toolchain](compiled/README.md#install-the-toolchain).
+Install Ruby 3.4.7, PostgreSQL and the [compiler toolchain](compiled/README.md#install-the-toolchain).
 Copy `compiled/toolchain.env.example` to `compiled/toolchain.env` and fill in the tool paths.
 
 ```sh

@@ -243,10 +243,14 @@ module InstantRecord
       #   :lww         - last-write-wins by server-anchored HLC (default)
       #   :union       - 3-way set/collection union (arrays, JSON arrays, CSV, hashes)
       #   :server_wins - server's already-committed value wins on collision
+      #   :yjs         - the column holds a Yjs document (its state as a Base64
+      #                  update), and the server merges every write into it, so
+      #                  concurrent and offline edits all survive. Needs the
+      #                  yrby gem on the server.
       def sync_merge(column, policy)
         policy = policy.to_sym
-        unless %i[lww union server_wins].include?(policy)
-          raise ArgumentError, "Unknown sync_merge policy #{policy.inspect}; expected :lww, :union, or :server_wins"
+        unless %i[lww union server_wins yjs].include?(policy)
+          raise ArgumentError, "Unknown sync_merge policy #{policy.inspect}; expected :lww, :union, :server_wins, or :yjs"
         end
 
         @instant_record_merge_policies ||= {}

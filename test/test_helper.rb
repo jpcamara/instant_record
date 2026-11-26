@@ -15,6 +15,7 @@ Time.zone = "UTC"
 # explicitly so server-side change logging is exercised without a Rails boot.
 require File.expand_path("../app/models/instant_record/change", __dir__)
 require File.expand_path("../app/models/instant_record/applied_mutation", __dir__)
+require File.expand_path("../app/models/instant_record/yjs_merge", __dir__)
 require File.expand_path("../app/models/instant_record/mutation_applier", __dir__)
 
 # Under Rails the engine does this each time the Change model loads.
@@ -30,6 +31,9 @@ ActiveRecord::Schema.define do
     t.string :title
     t.string :state
     t.string :owner
+    t.text :body
+    t.text :body_ydoc
+    t.text :title_ydoc
     t.integer :server_version, null: false, default: 0
     t.string :sync_state, null: false, default: "synced"
     t.timestamps

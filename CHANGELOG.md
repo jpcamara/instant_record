@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Yjs columns (`sync_merge :col, :yjs`).** A column can hold a Yjs document (its state as a Base64 update). The server merges each write into the stored document with [yrby](https://github.com/jpcamara/yrby) instead of choosing a winner, so concurrent and offline edits to the same text all survive, including writes older than the record. yrby is required only when a model declares a `:yjs` column.
+
 ## 0.3.0 (2026-11-21)
 
 ### Sync, Access Control, and Files

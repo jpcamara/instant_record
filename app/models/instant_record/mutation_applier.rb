@@ -51,6 +51,8 @@ module InstantRecord
       record_result(**result)
     rescue NotPermitted
       record_result(status: "rejected", reason: "not permitted", server_attributes: server_attributes_for(model))
+    rescue YjsMerge::Invalid => e
+      record_result(status: "rejected", reason: e.message, server_attributes: server_attributes_for(model))
     rescue ActiveRecord::RecordInvalid => e
       record_result(status: "rejected", reason: e.record.errors.full_messages.to_sentence,
         server_attributes: server_attributes_for(model))
@@ -231,6 +233,10 @@ module InstantRecord
         return { status: "rejected", reason: "record not found" } if existing && existing[column] != @scope
       end
 
+      # A :yjs column's incoming state is merged into the stored one first, so
+      # every path below writes the merge, never the bare incoming state.
+      merge_yjs_columns!(model) if %w[create update].include?(@mutation[:operation])
+
       server_now = HLC.wall_now
 
       case @mutation[:operation]
@@ -295,7 +301,12 @@ module InstantRecord
       # No concurrent version bump (or legacy caller with no base_version /
       # metadata-only touch): compare clamped HLCs.
       if record_hlc.present? && HLC.compare(incoming_hlc, record_hlc) < 0
-        return skipped_result(record, record_hlc)
+        # An older write still carries edits a :yjs column keeps. Apply those
+        # alone, stamped after what the record holds.
+        candidate_attrs = yjs_changes(model, record)
+        return skipped_result(record, record_hlc) if candidate_attrs.empty?
+
+        incoming_hlc = HLC.advance_past(record_hlc, incoming_hlc, now: server_now, node: HLC::SERVER_NODE)
       end
 
       safe_changes = clamp_updated_at(candidate_attrs, server_now, incoming_hlc)
@@ -308,7 +319,11 @@ module InstantRecord
       permit!(model)
       HLC.receive(incoming_hlc, now: server_now, node: HLC::SERVER_NODE)
       log_change(record, "update", hlc: incoming_hlc)
-      { status: "applied", version: record.server_version, hlc: incoming_hlc }
+      result = { status: "applied", version: record.server_version, hlc: incoming_hlc }
+      # A :yjs column now holds the merge, which can carry edits the sender
+      # has not seen, so the answer says what was stored.
+      result[:server_attributes] = InstantRecord.wire_attributes(record.attributes) if yjs_changes?(model)
+      result
     end
 
     def perform_three_way_merge(model, record, user_columns, base_version, incoming_hlc, record_hlc, server_now)
@@ -355,6 +370,9 @@ module InstantRecord
             incoming_wins: col_info[:hlc].nil? || HLC.compare(incoming_hlc, col_info[:hlc]) >= 0
           )
           winning[col] = merged_val if merged_val != record.public_send(col)
+        when :yjs
+          # Already merged with the stored state, so it holds both sides.
+          winning[col] = @changes[col] if @changes[col] != record.public_send(col)
         end
       end
 
@@ -444,6 +462,32 @@ module InstantRecord
       col_info[:nodes].all? { |n| n == incoming_node } &&
         col_info[:hlc].present? &&
         HLC.compare(incoming_hlc, col_info[:hlc]) > 0
+    end
+
+    # Replaces each incoming :yjs state with its merge into the stored one.
+    def merge_yjs_columns!(model)
+      columns = yjs_columns(model) & @changes.keys
+      return if columns.empty?
+
+      # Locked, so two writes to one record merge one after the other. The
+      # second then sees the first's version and clock.
+      stored = model.lock.find_by(id: @mutation[:record_id]) if @mutation[:operation] == "update"
+      columns.each do |column|
+        @changes[column] = YjsMerge.merge(stored && stored[column], @changes[column])
+      end
+    end
+
+    # The :yjs columns this write changes.
+    def yjs_changes(model, record)
+      @changes.slice(*yjs_columns(model)).reject { |column, state| state == record[column] }
+    end
+
+    def yjs_changes?(model)
+      yjs_columns(model).intersect?(@changes.keys)
+    end
+
+    def yjs_columns(model)
+      model.instant_record_merge_policies.select { |_column, policy| policy == :yjs }.keys
     end
 
     # 3-way collection union for `sync_merge :col, :union`:
