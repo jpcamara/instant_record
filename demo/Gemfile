@@ -8,6 +8,11 @@ gem "json", "< 3"
 
 # InstantRecord: the gem under development (this repo's root).
 gem "instant_record", path: ".."
+# Merges the Drafts demo's Yjs documents on the server (sync_merge :yjs).
+gem "yrby"
+# Fills a draft's title and text from its Yjs document (sync_merge fields:),
+# and ships the form's scripts.
+gem "yrby-forms", "0.1.0.alpha1"
 
 # The modern asset pipeline for Rails [https://github.com/rails/propshaft]
 gem "propshaft"

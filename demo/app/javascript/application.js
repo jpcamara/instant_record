@@ -1,6 +1,7 @@
 // Configure your import map in config/importmap.rb. Read more: https://github.com/rails/importmap-rails
 import "@hotwired/turbo-rails"
 import "controllers"
+import "yrby-forms/column"
 
 // The service worker keeps the app shell; InstantRecord keeps the data
 // (app/views/pwa/service-worker.js). This page loaded before the worker

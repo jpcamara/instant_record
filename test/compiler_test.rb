@@ -200,14 +200,14 @@ class CompilerTest < ActiveSupport::TestCase
       assert File.file?(manifest_path)
       manifest = InstantRecord::Compiler::Manifest.read(manifest_path)
       assert_equal "island", manifest.mode
-      assert_equal %w[AssistantChat AssistantTurn AuthNote Channel ChatUser Issue MailEntry Message Note], manifest.synced_model_names
+      assert_equal %w[AssistantChat AssistantTurn AuthNote Channel ChatUser Draft Issue MailEntry Message Note], manifest.synced_model_names
       assert_equal({ "limit" => 50, "partition_by" => "channel_id" }, manifest.sync_windows["Message"])
       assert_equal({ "column" => "visitor_id", "policy" => false }, manifest.sync_scopes["AssistantChat"])
       assert_equal({ "column" => nil, "policy" => true }, manifest.sync_scopes["AuthNote"])
       assert_equal manifest.to_h, staged.manifest.to_h
 
       count = InstantRecord::Compiler::GemVendor.vendor(gem_src: GEM_ROOT, app_dir: app, demo: true)
-      assert_equal 21, count
+      assert_equal 22, count
       assert File.file?(File.join(app, "lib/instant_record/client/rebaser.rb"))
       assert File.file?(File.join(app, "lib/instant_record/read_tracker.rb"))
       assert File.file?(File.join(app, "lib/instant_record/sync_notice.rb"))
@@ -769,6 +769,36 @@ class CompilerTest < ActiveSupport::TestCase
       assert File.file?(ios_out.join("libspinel_rt.a"))
       refute File.exist?(ios_out.join("host"))
       refute File.exist?(ios_out.join(InstantRecord::Compiler::NativeBuild.shared_library_name))
+    end
+  end
+
+  test "WasmBuild copies a pinned script from a gem's assets unless the app holds one" do
+    Dir.mktmpdir do |dir|
+      fake = create_fake_toolchain(dir)
+      assets = File.join(dir, "dist/assets")
+      gem_assets = File.join(dir, "widgets-1.0/app/assets/javascript")
+      FileUtils.mkdir_p(File.join(assets, "controllers"))
+      FileUtils.mkdir_p(File.join(gem_assets, "widgets"))
+      File.write(File.join(assets, "application.js"), "// app\n")
+      File.write(File.join(gem_assets, "application.js"), "// gem\n")
+      File.write(File.join(gem_assets, "widgets/widget.js"), "// widget\n")
+      importmap = File.join(dir, "importmap.rb")
+      File.write(importmap, <<~RUBY)
+        [{ name: "application", path: "/assets/application.js" },
+         { name: "widget", path: "/assets/widgets/widget.js?v=1" },
+         { name: "missing", path: "/assets/missing.js" }]
+      RUBY
+
+      build = InstantRecord::Compiler::WasmBuild.new(
+        workspace: dir,
+        gem_root: File.expand_path("..", __dir__),
+        toolchain: fake[:toolchain_file]
+      )
+      build.send(:copy_pinned_gem_assets, assets, importmap, gem_roots: [File.join(dir, "widgets-1.0")])
+
+      assert_equal "// widget\n", File.read(File.join(assets, "widgets/widget.js"))
+      assert_equal "// app\n", File.read(File.join(assets, "application.js"))
+      refute File.exist?(File.join(assets, "missing.js"))
     end
   end
 

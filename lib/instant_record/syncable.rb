@@ -247,7 +247,11 @@ module InstantRecord
       #                  update), and the server merges every write into it, so
       #                  concurrent and offline edits all survive. Needs the
       #                  yrby gem on the server.
-      def sync_merge(column, policy)
+      #
+      # A :yjs column can be the document of a yrby-forms form. fields: names
+      # the columns the form edits, and the server fills them from the merged
+      # document on every save. Needs the yrby-forms gem on the server.
+      def sync_merge(column, policy, fields: nil)
         policy = policy.to_sym
         unless %i[lww union server_wins yjs].include?(policy)
           raise ArgumentError, "Unknown sync_merge policy #{policy.inspect}; expected :lww, :union, :server_wins, or :yjs"
@@ -255,6 +259,17 @@ module InstantRecord
 
         @instant_record_merge_policies ||= {}
         @instant_record_merge_policies[column.to_s] = policy
+
+        server_only do
+          if fields
+            raise ArgumentError, "sync_merge fields: needs the :yjs policy" unless policy == :yjs
+            unless respond_to?(:has_collaborative_fields)
+              raise LoadError, "sync_merge fields: needs the yrby-forms gem on the server. Add `gem \"yrby-forms\"` to the Gemfile."
+            end
+
+            has_collaborative_fields(*fields, column: column)
+          end
+        end
       end
 
       def instant_record_merge_policies

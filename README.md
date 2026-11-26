@@ -183,6 +183,41 @@ end
 
 In the browser, an editor keeps the Yjs document and writes its whole state to the column. Each write holds everything that tab has seen, so the server always ends with the union. The record is saved with the merged state, so a `before_save` callback can read the document and fill plain columns from it for views and queries.
 
+A form can be that editor. With the [yrby-forms](https://github.com/jpcamara/yrby) gem, `fields:` names the columns the form edits. The form keeps them in the document, and the server fills them from the merged document on every save.
+
+```ruby
+class Draft < ApplicationRecord
+  include InstantRecord::Syncable
+
+  sync_merge :fields_ydoc, :yjs, fields: %i[title body]
+end
+```
+
+The gems ship the two scripts the form needs. Pin them, and import `yrby-forms/column` in `application.js`:
+
+```ruby
+# config/importmap.rb
+pin "yjs", to: "yrby/yjs.js"
+pin "yrby-forms/column", to: "yrby-forms/column.js"
+```
+
+The view wraps the document's param around the fields:
+
+```erb
+<%= form_with url: draft_path(@draft), method: :patch do |f| %>
+  <collaborative-fields name="draft[fields_ydoc]" value="<%= @draft.fields_ydoc %>" autosave>
+    <collaborative-field name="title" tier="text">
+      <%= f.text_field "draft[title]", value: @draft.title %>
+    </collaborative-field>
+    <collaborative-field name="body" tier="text">
+      <%= f.text_area "draft[body]", value: @draft.body %>
+    </collaborative-field>
+  </collaborative-fields>
+<% end %>
+```
+
+`autosave` posts the form shortly after each edit. The two elements are written as tags because the browser build compiles the form helpers Rails ships, and yrby-forms' `form.collaborative_fields` is not one of them. A string or text column takes `tier="text"`, which merges its text by character. An enum or any other column takes `tier="lww"`, where the last write wins.
+
 #### Server-only controller behavior: auth and scoping
 
 Controllers load in both runtimes too — the browser runs them against local data, the server against Postgres. Anything that depends on sessions, cookies, or secrets exists only on the server, so scope it there:
@@ -514,6 +549,7 @@ Things to try:
 - **Infinite scroll** — `/slack` seeds thousands of messages in `#general`, but a fresh client only syncs the newest 50 per conversation. Scroll to the top and older pages stream in; messages arriving mid-read update the page without a reload or a scroll jump.
 - **Offline** — stop the Rails server, create issues (they stay `pending`), reload the tab (still there), restart the server and watch them drain.
 - **Sessions and permissions** — open `/auth`, sign in as Ada, Ben or Cleo, and watch which notes this browser holds. Sign out and they leave it. "Ask the sync server for everything" shows what a browser with that cookie can get by asking directly.
+- **Offline co-editing** — open a draft at `/drafts` in two browsers, take both offline, and edit the title and the same sentence in each. When both reconnect, the server merges each field and every edit survives.
 - **Rejection** — create an issue titled `reject me`. It appears optimistically, the server refuses it, and it disappears on reconcile.
 
 ## Scaling the SSE stream

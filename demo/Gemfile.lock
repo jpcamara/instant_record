@@ -332,9 +332,27 @@ GEM
       base64
       websocket-extensions (>= 0.1.0)
     websocket-extensions (0.1.5)
+    yrby (0.9.1-arm64-darwin)
+    yrby-forms (0.1.0.alpha1)
+      actionview (>= 7.1)
+      activerecord (>= 7.1)
+      activesupport (>= 7.1)
+      railties (>= 7.1)
+      yrby (>= 0.9.0)
+      yrby-rails (>= 0.9)
+    yrby-rails (0.9.0)
+      actioncable (>= 7.1)
+      actionview (>= 7.1)
+      activerecord (>= 7.1)
+      activesupport (>= 7.1)
+      base64 (~> 0.2)
+      globalid (>= 1.0)
+      railties (>= 7.1)
+      yrby (>= 0.9.0)
     zeitwerk (2.8.2)
 
 PLATFORMS
+  arm64-darwin-23
   arm64-darwin-25
   arm64-darwin-27
 
@@ -361,6 +379,8 @@ DEPENDENCIES
   traces
   turbo-rails
   web-console
+  yrby
+  yrby-forms (= 0.1.0.alpha1)
 
 RUBY VERSION
    ruby 3.4.7p58

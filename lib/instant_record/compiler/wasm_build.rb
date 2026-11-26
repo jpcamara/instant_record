@@ -590,6 +590,7 @@ module InstantRecord
         end
 
         copy_hotwire_assets(assets)
+        copy_pinned_gem_assets(assets, File.join(emit, "config/importmap.rb"))
 
         if @demo
           SourcePages.write(
@@ -636,6 +637,24 @@ module InstantRecord
 
         HOTWIRE_ASSETS.each do |name|
           FileUtils.cp(found[name], assets) if found[name]
+        end
+      end
+
+      # A pin can name a script a gem ships, which Rails serves from the gem's
+      # asset folders. The site gets a copy of each one the app does not hold.
+      def copy_pinned_gem_assets(assets, importmap, gem_roots: Gem.loaded_specs.values.map(&:full_gem_path))
+        return unless File.file?(importmap)
+
+        folders = gem_roots.flat_map { |root| Dir.glob(File.join(root, "{app,lib,vendor}/assets/*")).sort }
+        File.read(importmap).scan(%r{"/assets/([^"?]+)}).flatten.uniq.each do |rel|
+          target = File.join(assets, rel)
+          next if File.exist?(target)
+
+          source = folders.map { |folder| File.join(folder, rel) }.find { |path| File.file?(path) }
+          next unless source
+
+          FileUtils.mkdir_p(File.dirname(target))
+          FileUtils.cp(source, target)
         end
       end
 

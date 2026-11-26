@@ -167,6 +167,7 @@
 }
 
 .demo-home .demo-card-todo { --card-ink: #3E6B4F; --card-wash: linear-gradient(160deg, #DCE9D9, #F4F0E6); }
+.demo-home .demo-card-drafts { --card-ink: #6B4F3E; --card-wash: linear-gradient(160deg, #EBDDD0, #F4F0E6); }
 .demo-home .demo-card-chat { --card-ink: #C25A2C; --card-wash: linear-gradient(160deg, #FFD9C4, #F7EBDD); }
 .demo-home .demo-card-inbox { --card-ink: #2F6CA3; --card-wash: linear-gradient(160deg, #D8E6F3, #F4EEE4); }
 .demo-home .demo-card-assistant { --card-ink: #9A4A2A; --card-wash: linear-gradient(160deg, #F3DCCB, #F6F0E6); }

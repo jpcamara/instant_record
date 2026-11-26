@@ -1,0 +1,26 @@
+<% content_for(:title, "#{@draft.title} — InstantRecord") %>
+
+<div class="page">
+  <header class="page-header">
+    <h1><%= @draft.title %></h1>
+    <p class="meta">
+      The form keeps the title and the text in one Yjs document and posts it
+      after each edit. The server merges it into the document it holds, so
+      offline edits to either field all survive. What it shows everyone is
+      read from the merged document.
+    </p>
+  </header>
+
+  <%= form_with url: draft_path(@draft), method: :patch, class: "card" do |f| %>
+    <collaborative-fields name="draft[fields_ydoc]" value="<%= @draft.fields_ydoc %>" autosave>
+      <collaborative-field name="title" tier="text">
+        <%= f.text_field "draft[title]", value: @draft.title, class: "draft-title", aria: { label: "Draft title" } %>
+      </collaborative-field>
+      <collaborative-field name="body" tier="text">
+        <%= f.text_area "draft[body]", value: @draft.body, rows: 10, class: "draft-editor", aria: { label: "Draft text" } %>
+      </collaborative-field>
+    </collaborative-fields>
+  <% end %>
+
+  <p class="meta">This page was rendered by Rails <%= InstantRecord.browser? ? "inside your browser" : "on the server" %>: <b><%= InstantRecord.browser? ? "Spinel + SQLite" : "CRuby + Postgres" %></b>.</p>
+</div>

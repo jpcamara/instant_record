@@ -1,0 +1,52 @@
+/* Drafts demo (namespaced under body.demo-drafts).
+   Brown accent on the home card. One white card holds the list, and on a
+   draft's page, the title and the text. */
+
+.demo-drafts .page { max-width: 760px; }
+
+.demo-drafts .draft-form {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  border-bottom: 1px solid var(--hairline-soft);
+}
+
+.demo-drafts .draft-form input[type="text"] { flex: 1; min-width: 0; }
+
+/* The yrby-forms elements around the fields take no box of their own. */
+.demo-drafts collaborative-fields,
+.demo-drafts collaborative-field { display: contents; }
+
+.demo-drafts .drafts { list-style: none; margin: 0; padding: 0; }
+
+.demo-drafts .drafts li { padding: 12px 18px; border-bottom: 1px solid var(--hairline-soft); }
+
+.demo-drafts .drafts li:last-child { border-bottom: 0; }
+
+.demo-drafts .draft-title {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px 18px;
+  border: 0;
+  border-bottom: 1px solid var(--hairline-soft);
+  background: transparent;
+  font: inherit;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.demo-drafts .draft-editor {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 18px;
+  border: 0;
+  resize: vertical;
+  background: transparent;
+  font: inherit;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.demo-drafts .card + .meta { margin-top: 20px; }

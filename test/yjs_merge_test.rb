@@ -1,5 +1,9 @@
 require "test_helper"
 require "yrby"
+require "yrby-forms"
+
+# Under Rails the yrby-forms engine does this.
+ActiveRecord::Base.include Y::Forms::CollaborativeFields
 
 class YjsMergeTest < Minitest::Test
   HLC = InstantRecord::HLC
@@ -144,6 +148,37 @@ class YjsMergeTest < Minitest::Test
     record = @model.find("n-1")
     assert_equal "Please Ship it today", record.body
     assert_equal "done", record.state, "the plain column is last-write-wins"
+  end
+
+  def test_fields_fills_the_named_columns_from_the_merged_document
+    @model = syncable_model("Note") { sync_merge :body_ydoc, :yjs, fields: %i[title body] }
+    InstantRecord.sync(@model)
+    base = edit(doc_with("Plan", name: "fields/title")) { |doc| doc.get_text("fields/body").insert(0, "Ship it") }
+    create_note(base)
+
+    a = copy_of(base, name: "fields/body") { |text| text.insert(7, " today") }
+    b = copy_of(base, name: "fields/title") { |text| text.insert(0, "Launch ") }
+    update_note("m-a", a, at: @t0 + 10)
+    update_note("m-b", b, at: @t0 + 20)
+
+    record = @model.find("n-1")
+    assert_equal "Launch Plan", record.title
+    assert_equal "Ship it today", record.body
+  end
+
+  def test_fields_needs_the_yjs_policy
+    error = assert_raises(ArgumentError) { syncable_model("Note") { sync_merge :body_ydoc, :lww, fields: %i[body] } }
+    assert_equal "sync_merge fields: needs the :yjs policy", error.message
+  end
+
+  def test_fields_without_yrby_forms_says_which_gem_to_add
+    error = assert_raises(LoadError) do
+      syncable_model("Note") do
+        singleton_class.undef_method(:has_collaborative_fields)
+        sync_merge :body_ydoc, :yjs, fields: %i[body]
+      end
+    end
+    assert_includes error.message, 'Add `gem "yrby-forms"` to the Gemfile.'
   end
 
   # The Y.Text called `name` in a stored state.
