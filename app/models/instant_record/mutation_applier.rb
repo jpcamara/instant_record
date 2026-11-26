@@ -469,7 +469,9 @@ module InstantRecord
       columns = yjs_columns(model) & @changes.keys
       return if columns.empty?
 
-      stored = model.find_by(id: @mutation[:record_id]) if @mutation[:operation] == "update"
+      # Locked, so two writes to one record merge one after the other. The
+      # second then sees the first's version and clock.
+      stored = model.lock.find_by(id: @mutation[:record_id]) if @mutation[:operation] == "update"
       columns.each do |column|
         @changes[column] = YjsMerge.merge(stored && stored[column], @changes[column])
       end
